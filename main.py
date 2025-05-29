@@ -9,6 +9,12 @@ from dotenv import load_dotenv
 
 from g4f.client import Client
 
+from g4f.requests.raise_for_status import CloudflareError
+
+
+from aiogram import types
+from aiogram.fsm.context import FSMContext
+
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -32,22 +38,22 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 
 # Обработчик вопроса пользователя
+
 @dp.message(Form.question)
 async def handle_question(message: types.Message, state: FSMContext):
-    await message.answer("Обрабатываю твой вопрос...")
+    try:
+        response = client.chat.completions.create(
+            model="o4-mini",
+            messages=[{"role": "user", "content": message.text}],
+        )
+        await message.answer(response.choices[0].message.content)
+    except CloudflareError:
+        await message.answer("Сервис временно недоступен из-за защиты Cloudflare. Попробуйте позже.")
+    except Exception as e:
+        await message.answer(f"Произошла ошибка: {e}")
 
-    # Отправка запроса к g4f
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": message.text}],
-        web_search=False
-    )
-
-    # Отправка ответа пользователю
-    await message.answer(response.choices[0].message.content)
-
-    # Очистка состояния
     await state.clear()
+
 
 
 # Запуск бота
